@@ -1,0 +1,11 @@
+input,expected_risk_level
+"Invoice 14 days past due — customer says wire is scheduled Friday",medium
+"Payment received on time; no AR action needed",low
+"Third consecutive late payment this quarter — same customer",high
+"New vendor — first invoice, standard Net 30",low
+"Customer requested 60-day terms extension; CFO must approve",medium
+"$2M invoice 45 days overdue; no response to collections",high
+"Duplicate invoice detected before payment — held in AP",low
+"Minor delay: 5 days late due to holiday closure",low
+"Escalation: legal reviewing contract before we release payment hold",medium
+"Auto-pay failed — card expired; customer updating card today",low

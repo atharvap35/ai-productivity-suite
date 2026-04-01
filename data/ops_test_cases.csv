@@ -1,0 +1,13 @@
+input,expected_issue_type,expected_priority,expected_team
+"SAP connector timing out on prod sync — customer blocked, need fix today",integration,high,Platform Engineering
+"Reports page spinner never stops in Chrome after last deploy",ui bug,medium,Frontend
+"ACH batch failed overnight; finance needs root cause",payment,high,Payments
+"New hire cannot log into VPN — MFA says invalid token",access,medium,IT Security
+"REST API returning 503 from /v2/invoices since 9am",backend,high,Backend
+"Export to Excel drops rows when file > 5MB",performance,medium,Backend
+"Customer charged twice for same subscription ID",billing,high,Finance Ops
+"Slack alert: queue depth > 10k for email worker",monitoring,medium,Platform Engineering
+"How do I reset my password? Link expired",access,low,IT Support
+"Mobile app crashes on open after iOS 18 update",ui bug,high,Mobile
+"Webhook retries exhausted — partner says they never got events",integration,medium,Platform Engineering
+"Staging DB migration script failed mid-run — need DBA",database,high,Data Platform

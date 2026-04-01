@@ -1,0 +1,12 @@
+input,expected_deal_stage,expected_next_step
+"Prospect asked for security questionnaire before pilot — send SOC2 pack",discovery,Send SOC2 and security FAQ
+"Pricing still too high vs competitor X; wants discount to move forward",negotiation,Schedule exec alignment on pricing
+"Agreed to pilot next month — need MSA redlines from legal",proposal,Route MSA to legal review
+"Champion ghosted after demo; nudge with ROI one-pager",qualification,Send ROI summary and book follow-up
+"Signed order form — waiting on procurement PO number",closing,Confirm PO and kick off onboarding
+"Discovery call went well; wants use cases for claims module",discovery,Send tailored use-case deck
+"Deal stuck — budget frozen until Q3",negotiation,Qualify timeline and revisit in Q3
+"Closed-won: verbal yes, contract out for signature",closing,Track signature and hand to CS
+"Follow up next week on pricing — they need internal approval",negotiation,Calendar pricing review for next week
+"RFP submitted; we are short-listed for oral presentation",proposal,Prep oral deck and speaker roster
+"Lost to incumbent — relationship too deep",closed lost,Log loss reason and nurture for next year
