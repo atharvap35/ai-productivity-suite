@@ -144,3 +144,9 @@ def complete_json(
             "error": f"Invalid JSON from model: {e}",
             "raw": text,
         }
+import os
+
+def is_llm_configured():
+    return os.getenv("OPENAI_API_KEY") is not None
+
+   
