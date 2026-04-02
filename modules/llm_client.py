@@ -1,152 +1,187 @@
-"""OpenAI-compatible LLM client: prompt + user input → structured JSON."""
+"""LLM client: Ollama (default) + OpenAI fallback → structured JSON"""
 
 from __future__ import annotations
 
 import json
 import os
 import re
+import requests
 from pathlib import Path
 from typing import Any
 
-from openai import APIError, APITimeoutError, OpenAI, RateLimitError
+from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+
+# -------------------------
+# CONFIG
+# -------------------------
 
 DEFAULT_MODEL = "gpt-4o-mini"
 DEFAULT_TEMPERATURE = 0.2
 
+OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_MODEL = "mistral"  # 🔥 fast + reliable
 
-def _load_dotenv() -> None:
+
+# -------------------------
+# ENV SETUP
+# -------------------------
+
+def _load_dotenv():
     try:
         from dotenv import load_dotenv
-
         load_dotenv(Path(__file__).resolve().parent.parent / ".env")
-    except ImportError:
+    except:
         pass
 
 
 _load_dotenv()
 
 
-def _env(key: str, default: str | None = None) -> str | None:
+def _env(key: str, default=None):
     val = os.environ.get(key)
-    if val is None or val.strip() == "":
-        return default
-    return val.strip()
+    return val.strip() if val else default
 
 
-def _openai_api_key() -> str | None:
+def _openai_api_key():
     key = _env("OPENAI_API_KEY")
     if key:
         return key
+
     try:
         import streamlit as st
-
         if hasattr(st, "secrets") and "OPENAI_API_KEY" in st.secrets:
-            v = st.secrets["OPENAI_API_KEY"]
-            if v is not None and str(v).strip():
-                return str(v).strip()
-    except Exception:
+            return st.secrets["OPENAI_API_KEY"]
+    except:
         pass
+
     return None
 
 
-def is_llm_configured() -> bool:
-    """True if an API key is available (env, ``.env``, or Streamlit secrets)."""
-    return bool(_openai_api_key())
+def is_llm_configured():
+    """Check if either OpenAI or Ollama is available"""
+    if _openai_api_key():
+        return True
+
+    try:
+        requests.get("http://localhost:11434", timeout=2)
+        return True
+    except:
+        return False
 
 
-def _get_client() -> OpenAI | None:
-    api_key = _openai_api_key()
-    if not api_key:
-        return None
-    base_url = _env("OPENAI_BASE_URL")
-    kwargs: dict[str, Any] = {"api_key": api_key}
-    if base_url:
-        kwargs["base_url"] = base_url
-    return OpenAI(**kwargs)
+# -------------------------
+# JSON CLEANER
+# -------------------------
+
+def _extract_json(text: str):
+    text = text.strip()
+
+    # remove markdown
+    text = re.sub(r"```json|```", "", text).strip()
+
+    # extract first json object
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        return match.group(0)
+
+    return text
 
 
-def _extract_json_text(raw: str) -> str:
-    raw = raw.strip()
-    fence = re.match(r"^```(?:json)?\s*\n?(.*?)\n?```\s*$", raw, re.DOTALL | re.IGNORECASE)
-    if fence:
-        return fence.group(1).strip()
-    return raw
-
-
-def _parse_json_object(text: str) -> dict[str, Any]:
-    cleaned = _extract_json_text(text)
+def _parse_json(text: str):
+    cleaned = _extract_json(text)
     return json.loads(cleaned)
 
 
-def complete_json(
-    system_prompt: str,
-    user_input: str,
-    *,
-    model: str | None = None,
-    temperature: float = DEFAULT_TEMPERATURE,
-) -> dict[str, Any]:
-    """
-    Call the chat API and return a single JSON object.
+# -------------------------
+# OLLAMA (PRIMARY)
+# -------------------------
 
-    On success: ``{"ok": True, "data": <dict>}``
-    On failure: ``{"ok": False, "error": <str>, "raw": <str | None>}``
+def _call_ollama(system_prompt: str, user_input: str):
+    try:
+        full_prompt = f"""{system_prompt}
+
+IMPORTANT:
+Return ONLY valid JSON.
+Do NOT include explanation.
+
+User Input:
+{user_input}
+"""
+
+        response = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": full_prompt,
+                "stream": False
+            },
+            timeout=120  # 🔥 increased timeout
+        )
+
+        text = response.json().get("response", "")
+
+        try:
+            data = _parse_json(text)
+            return {"ok": True, "data": data}
+        except:
+            return {"ok": False, "error": "Invalid JSON from Ollama", "raw": text}
+
+    except Exception as e:
+        return {"ok": False, "error": str(e), "raw": None}
+
+
+# -------------------------
+# OPENAI (FALLBACK)
+# -------------------------
+
+def _get_client():
+    key = _openai_api_key()
+    if not key:
+        return None
+    return OpenAI(api_key=key)
+
+
+# -------------------------
+# MAIN FUNCTION
+# -------------------------
+
+def complete_json(system_prompt: str, user_input: str, *, model=None, temperature=DEFAULT_TEMPERATURE):
     """
+    Returns:
+    {"ok": True, "data": dict}
+    OR
+    {"ok": False, "error": str, "raw": str}
+    """
+
+    # 🔥 TRY OLLAMA FIRST
+    ollama_result = _call_ollama(system_prompt, user_input)
+
+    if ollama_result["ok"]:
+        return ollama_result
+
+    # fallback to OpenAI if available
     client = _get_client()
     if client is None:
-        return {
-            "ok": False,
-            "error": (
-                "Missing OPENAI_API_KEY. Add it to a `.env` file in the project root, "
-                "your environment, or `.streamlit/secrets.toml` (key: OPENAI_API_KEY)."
-            ),
-            "raw": None,
-        }
-
-    use_model = model or _env("OPENAI_MODEL", DEFAULT_MODEL) or DEFAULT_MODEL
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_input},
-    ]
+        return ollama_result
 
     try:
         completion = client.chat.completions.create(
-            model=use_model,
-            messages=messages,
+            model=model or DEFAULT_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_input}
+            ],
             temperature=temperature,
             response_format={"type": "json_object"},
         )
-    except RateLimitError as e:
-        return {"ok": False, "error": f"Rate limited: {e}", "raw": None}
-    except APITimeoutError as e:
-        return {"ok": False, "error": f"Request timed out: {e}", "raw": None}
-    except APIError as e:
-        return {"ok": False, "error": f"API error: {e}", "raw": None}
+
+        text = completion.choices[0].message.content
+
+        try:
+            data = _parse_json(text)
+            return {"ok": True, "data": data}
+        except:
+            return {"ok": False, "error": "Invalid JSON from OpenAI", "raw": text}
+
     except Exception as e:
-        return {"ok": False, "error": f"Request failed: {e}", "raw": None}
-
-    choice = completion.choices[0] if completion.choices else None
-    if not choice or not choice.message or choice.message.content is None:
-        return {"ok": False, "error": "Empty response from model.", "raw": None}
-
-    text = choice.message.content
-    try:
-        data = _parse_json_object(text)
-        if not isinstance(data, dict):
-            return {
-                "ok": False,
-                "error": "Model returned JSON that is not an object.",
-                "raw": text,
-            }
-        return {"ok": True, "data": data}
-    except json.JSONDecodeError as e:
-        return {
-            "ok": False,
-            "error": f"Invalid JSON from model: {e}",
-            "raw": text,
-        }
-import os
-
-def is_llm_configured():
-    return os.getenv("OPENAI_API_KEY") is not None
-
-   
+        return {"ok": False, "error": str(e), "raw": None}
