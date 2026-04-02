@@ -22,6 +22,18 @@ st.markdown(
 
 st.divider()
 
+st.markdown("""
+### 👨‍💻 Credits  
+
+**Atharva Pund**  
+Sole creator of this AI Internal Productivity Suite.  
+
+🔗 GitHub: https://github.com/atharvap35/ai-productivity-suite  
+🎯 Built for: AI Solutions Specialist role (internal productivity use cases)
+""")
+
+st.divider()
+
 st.subheader("Overview")
 c1, c2, c3, c4 = st.columns(4)
 with c1:
