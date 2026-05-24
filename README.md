@@ -2,6 +2,8 @@
 
 Local Streamlit app demonstrating AI workflows for Operations, Sales, Marketing/GTM, and Finance.
 
+Live App: http://13.50.54.89:8501/
+
 ## Setup
 
 ```bash
